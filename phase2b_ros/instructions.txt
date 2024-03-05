@@ -1,0 +1,12 @@
+System must have a ROS environment set up. This program was developed on ROS Noetic set up on Ubuntu 20.04 Focal.
+
+To run the code:
+1. Follow the same steps as Phase 2A but run ros_publisher on the receiving system instead of lora_receiver.
+2. In a new terminal window, launch roscore
+3. In a new terminal window, run:
+rosrun rosserial_python serial_node.py /dev/ttyUSB0
+4. In a new terminal window, run:
+rostopic echo "bangle"
+
+For more info:
+https://wiki.ros.org/rosserial_arduino/Tutorials/Hello%20World

@@ -1,0 +1,553 @@
+</html>
+<head>
+  <title>Bangle.js Dashboard</title>
+  <style>
+    .heartRateContainer, .accelContainer {
+      text-align: center;
+      display: flex;
+      justify-content: space-around;
+      margin-top: 10px; /* Added margin for spacing */
+      margin-bottom: 20px;
+    }
+    .accelContainer {
+      margin-top: 50px;
+    }
+    .heading {
+      width: 150px;
+      font-size: 25px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .heartRateValue, .maxValue, .crit, .impact, .noMotion, .gpsVal {
+      width: 150px;
+      height: 150px; /* Adjust height as needed */
+      background-color: #f2d9db; /* Heart Rate Value background color */
+      border-radius: 10px;
+      text-align: center;
+      line-height: 200px; /* Adjust line-height to vertically center text */
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      font-size: 90px; /* Adjust font size as needed */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .maxValue {
+      background-color: #d9eff2; /* Max Value background color */
+    }
+    .crit {
+      background-color: #86de0c;
+      font-size: 70px;
+    }
+    .impact {
+      background-color: #86de0c;
+      font-size: 70px;
+    }
+    .noMotion {
+      background-color: #86de0c;
+      font-size: 70px;
+    }
+    .gpsVal {
+      height: 75px;
+      background-color: #c7e3a0;
+      font-size: 30px;
+    }
+
+    #webgl-container {
+      width: 150px;
+      height: 150px;
+      border-radius: 10px;
+      border: 1px solid black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #map {
+      height: 200px;
+      margin-top: 10px;
+      margin-left: 5%;
+      margin-right: 5%;
+    }
+  </style>
+   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+</head>
+<body>
+  <script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+  <script src="https://www.puck-js.com/puck.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+  <button id="btnConnect">Connect</button>
+
+  <div class="heartRateContainer" style="margin-top: 0px;">
+    <div id="chartContainer" style="height: 400px; width:60%; margin-top: 10px;"></div>
+    <div class="heartRateContainer" style="width: 40%; flex-direction: column;">
+      <div class="heartRateContainer">
+        <div>
+          <div class="heading">BPM</div>
+          <div id="heartRateValue" class="heartRateValue">0</div>
+        </div>
+        <div>
+          <div class="heading">Max BPM</div>
+          <div id="maxValue" class="maxValue">0</div>
+        </div>
+        <div>
+          <div class="heading">BPM Status</div>
+          <div id="crit" class="crit">OK</div>
+        </div>
+      </div>
+      <div id="map" style="width: 90%; justify-content: center;"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <div class="heartRateContainer">
+    <div id="accelContainer" style="height: 400px; width:60%; margin-top: 20px;"></div>
+    <div class="heartRateContainer" style="width: 40%; flex-direction: column;">
+      <div class="heartRateContainer">
+        <div>
+          <div class="heading" style="font-size: 20px;">Latitude</div>
+          <div id="latitude" class="gpsVal" style="font-size: 24px;">N/A</div>
+        </div>
+        <div>
+          <div class="heading" style="font-size: 20px;">Longitude</div>
+          <div id="longitude" class="gpsVal" style="font-size: 24px;">N/A</div>
+        </div>
+        <div>
+          <div class="heading" style="font-size: 18px;">Time since Fix</div>
+          <div id="fixTime" class="gpsVal">N/A</div>
+        </div>
+      </div>
+      <div class="heartRateContainer">
+        <div>
+          <div class="heading">Rotation</div>
+          <div id="webgl-container"></div>
+        </div>
+        <div>
+          <div class="heading">Impact</div>
+          <div id="impact" class="impact">OK</div>
+        </div>
+        <div>
+          <div class="heading">No Motion</div>
+          <div id="noMotion" class="noMotion">OK</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>
+<script>
+  // Code to upload to Bangle.js
+  const NO_MOTION_TRIG = 10000;
+  const WAITRESPONSE = 10000;
+  const HRM_MIN = 40;
+  const HRM_MAX = 180;
+  const ACCEL_MIN = 0;
+  const ACCEL_MAX = 3;
+  const BPM_CRIT = 120;
+  
+  var BANGLE_CODE = `
+  Bangle.setHRMPower(1);
+  Bangle.on('HRM',function(hrm) {
+    var d = [
+      "H",
+      hrm.bpm,
+      hrm.confidence
+      ];
+    Bluetooth.println(d.join(","));
+  })
+  
+  Bangle.on('accel',function(a) {
+    var d = [
+      "A",
+      Math.round(a.x*100),
+      Math.round(a.y*100),
+      Math.round(a.z*100)
+      ];
+    Bluetooth.println(d.join(","));
+  })
+
+  setWatch(function() {
+    var d = [
+      "B",
+      "Pressed"
+      ];
+    Bluetooth.println(d.join(","));
+  }, BTN, {edge:"falling", repeat:true});
+
+  Bangle.setGPSPower(1);
+  Bangle.on('GPS', function(gps) {
+    if (gps != undefined && gps.fix == 1) {
+      var d = [
+        "G",
+        gps.lat.toFixed(6),
+        gps.lon.toFixed(6),
+        ];
+      Bluetooth.println(d.join(","));
+    }
+  });
+  `;
+
+  var maxBPM = 0;
+
+  // When we click the connect button...
+  var connection;
+  const btnElement = document.getElementById('btnConnect');
+  btnElement.addEventListener("click", function() {
+    // disconnect if connected already
+    if (connection) {
+      connection.close();
+      connection = undefined;
+    }
+    // Connect
+    Puck.connect(function(c) {
+      if (!c) {
+        alert("Couldn't connect!");
+        return;
+      }
+      connection = c;
+      
+      btnElement.style.backgroundColor = "#abf7b1";
+      btnElement.textContent = "Connected";
+
+      // Handle the data we get back, and call 'onLine'
+      // whenever we get a line
+      var buf = "";
+      connection.on("data", function(d) {
+        buf += d;
+        var l = buf.split("\n");
+        buf = l.pop();
+        l.forEach(onLine);
+      });
+      // First, reset the Bangle
+      connection.write("reset();\n", function() {
+        // Wait for it to reset itself
+        setTimeout(function() {
+          // Now upload our code to it
+          connection.write("\x03\x10if(1){"+BANGLE_CODE+"}\n",
+            function() { console.log("Ready..."); });
+        }, 1500);
+      });
+    });
+  });
+
+  //Chart Setup
+  var dps = []; // dataPoints
+  var dpsArea = []; // Area
+  var chart = new CanvasJS.Chart("chartContainer", {
+    animationEnabled: true,
+    theme: "light2",
+    title :{
+      text: "Bangle.js HeartRate Monitor"
+    },
+    axisY:{
+      title: "Heart Rate (bpm)",
+      lineColor: "#C24642",
+      labelFontColor: "#C24642",
+      titleFontColor: "#C24642",
+    },
+    axisX:{
+      title: "Time",
+      valueFormatString: "HH:mm:ss",
+    },
+    axisY:{
+      title: "Heart rate (bpm)",
+      minimum: HRM_MIN,
+      maximum: HRM_MAX
+    },
+    data: [{
+      type: "rangeArea",
+      color: "#e9a4aa",
+      dataPoints: dpsArea
+    }, {
+      type: "line",
+      name: "Heart Rate",
+      color: "#C24642",
+      dataPoints: dps
+    }]
+  });
+
+  var aps = []; // accel dataPoints
+  var chartAccel = new CanvasJS.Chart("accelContainer", {
+    animationEnabled: true,
+    theme: "light2",
+    title :{
+      text: "Acceleration"
+    },
+    axisY:{
+      title: "Acceleration (G)",
+      minimum: ACCEL_MIN,
+      maximum: ACCEL_MAX
+    },
+    axisX:{
+      title: "Time",
+      valueFormatString: "HH:mm:ss",
+    },
+    data: [{
+      type: "line",
+      name: "Accelerometer",
+      dataPoints: aps
+    }]
+  });
+
+  chart.render();
+  chartAccel.render();
+  var dataLength = 60; // number of dataPoints visible at any point
+
+  var updateChart = function (hr) {
+    if (dps.length <= dataLength) {
+      labelVal = new Date().toISOString();
+      xVal = new Date;
+      yVal = hr.hr;
+      y2Val = hr.conf;
+
+      if (yVal == 0) {
+        return;
+      } else if (yVal > maxBPM) {
+        maxBPM = yVal;
+        const maxElement = document.getElementById('maxValue');
+        maxElement.innerText = maxBPM;
+      }
+
+      const statusElement = document.getElementById('crit');
+      if (yVal >= BPM_CRIT) {
+        statusElement.style.backgroundColor = "#de0c0c";
+        statusElement.style.fontSize = "30px";
+        statusElement.innerText = "Critical";
+      } else {
+        statusElement.style.backgroundColor = "#86de0c";
+        statusElement.style.fontSize = "70px";
+        statusElement.innerText = "OK";
+      }
+
+      const heartRateValueElement = document.getElementById('heartRateValue');
+      heartRateValueElement.innerText = yVal;
+
+      weighting = yVal - (yVal * y2Val / 100);
+      dps.push({
+        x: xVal,
+        y: yVal
+      });
+
+      yMin = yVal - weighting;
+      yMax = yVal + weighting;
+      if (yMin < HRM_MIN)
+        yMin = HRM_MIN
+      if (yMax > HRM_MAX)
+        yMax = HRM_MAX
+
+      dpsArea.push({
+        x: xVal,
+        y: [yVal - weighting, yVal + weighting]
+      });
+    }
+
+    if (dps.length > dataLength) {
+      dps.shift();
+      dpsArea.shift();
+    }
+
+    chart.render();
+  };
+
+  function falseAlarm() {
+    BANGLE_CODE3 = `
+      g.clear();
+      Bangle.buzz();
+    `;
+    connection.write("\x10{"+BANGLE_CODE3+"}\n");
+
+    const impactElement = document.getElementById('impact');
+    impactElement.style.backgroundColor = "#86de0c";
+    impactElement.style.fontSize = "70px";
+    impactElement.innerText = "OK";
+  }
+
+  function fall() {
+    BANGLE_CODE3 = `
+      Bluetooth.println(E.showMessage("Sharing location!"));
+    `;
+    connection.write("\x10{"+BANGLE_CODE3+"}\n");
+
+    const impactElement = document.getElementById('impact');
+    impactElement.style.backgroundColor = "#de0c0c";
+    impactElement.style.fontSize = "30px";
+    impactElement.innerText = "Critical";
+  }
+
+  // Function to respond to fall with BUTTON press
+  function respondToFall() {
+    BANGLE_CODE2 = `
+      Bangle.buzz(2000);
+      Bangle.setLocked(false);
+      Bluetooth.println(E.showMessage("Have you fallen? Press BTN for NO!"));
+    `;
+
+    buttonPressed = false;
+    connection.write("\x10{"+BANGLE_CODE2+"}\n");
+
+    var startTime = Date.now();
+    var endTime = startTime + WAITRESPONSE;
+
+    var checkButtonPressed = function() {
+      if (buttonPressed) {
+        falseAlarm();
+        return;
+      }
+
+      if (Date.now() < endTime) {
+        setTimeout(checkButtonPressed, 100); // Check every 100 milliseconds
+      } else {
+        connection.write("\x10Bangle.buzz()\n");
+        buttonPressed = false;
+        fall();
+      }
+    };
+
+    checkButtonPressed();
+  }
+
+  var motionTime = Date.now();
+  var updateAccelChart = function(accel) {
+    if (aps.length <= dataLength) {
+      labelVal = new Date().toISOString();
+      xVal = new Date;
+      yVal = Math.sqrt(accel.x*accel.x + accel.y*accel.y + accel.z*accel.z) - 100;
+    
+      if (yVal < 0)
+        yVal = 0;
+
+      aps.push({
+        x: xVal,
+        y: yVal/100
+      });
+    }
+
+    if (aps.length > dataLength) {
+      aps.shift();
+    }
+
+    if (yVal > 175 && Math.abs(accel.z) > 150) {
+      const impactElement = document.getElementById('impact');
+      impactElement.style.backgroundColor = "#e6a121";
+      impactElement.style.fontSize = "25px";
+      impactElement.innerText = "Attention";
+      respondToFall();
+    }
+
+    const motionElement = document.getElementById('noMotion');
+    if (yVal > 10) {
+      motionTime = Date.now();
+      motionElement.style.backgroundColor = "#86de0c";
+      motionElement.style.fontSize = "70px";
+      motionElement.innerText = "OK";
+    } else if (Date.now() - motionTime > NO_MOTION_TRIG) {
+      motionElement.style.backgroundColor = "#de0c0c";
+      motionElement.style.fontSize = "30px";
+      motionElement.innerText = "Critical";
+    }
+
+    chartAccel.render();
+  }
+
+  // When we get a line of data, check it and if it's
+  // from the heart rate monitor, update it
+  var buttonPressed = false;
+  var lastFixTime;
+  function onLine(line) {
+    console.log("RECEIVED:"+line);
+    var d = line.split(",");
+    if (d.length==3 && d[0]=="H") {
+      // we have an HR monitor reading
+      var hr_data = {
+        hr : parseInt(d[1]),
+        conf : parseInt(d[2]),
+      };
+      if (hr_data.conf > 50) {
+        updateChart(hr_data);
+      }
+    } else if (d.length==4 && d[0]=="A") {
+      // we have an accelerometer reading
+      accel.x = parseInt(d[1]);
+      accel.y = parseInt(d[2]) * -1;
+      accel.z = parseInt(d[3]);
+      render();
+      updateAccelChart(accel);
+    } else if (d.length==2 && d[0]=="B") {
+      buttonPressed = true;
+    } else if (d.length==3 && d[0]=="G") {
+      lastFixTime = Date.now();
+      coords = [parseFloat(d[1]), parseFloat(d[2])];
+      updateMap();
+    }
+    const timeElem = document.getElementById('fixTime');
+    if (typeof lastFixTime !== 'undefined') {
+      timeElem.innerText = (((Date.now() - lastFixTime) * 0.001).toFixed(2)) + 's';
+    }
+  }
+
+  var scene, camera, renderer, cube;
+  var WIDTH = 145; // Adjust as needed
+  var HEIGHT = 145; // Adjust as needed
+
+  function init() {
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(70, WIDTH / HEIGHT, 0.5, 10);
+    camera.position.set(0, 2, 4);
+    camera.lookAt(scene.position);
+
+    cube = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshNormalMaterial());
+    scene.add(cube);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(WIDTH, HEIGHT);
+
+    document.getElementById('webgl-container').appendChild(renderer.domElement);
+  }
+
+  function render() {
+    cube.lookAt(accel);
+    renderer.render(scene, camera);
+  }
+
+  var map = L.map('map').setView([-33.87, 151.21], 12);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+  var marker = L.marker([-33, 150], {opacity: 0}).addTo(map);
+
+  function updateMap() {
+    if (coords.length != 2 || typeof coords[0] !== 'number' || typeof coords[1] !== 'number') {
+      return;
+    }
+
+    const latElem = document.getElementById('latitude');
+    const lonElem =  document.getElementById('longitude');
+    latElem.innerText = coords[0];
+    lonElem.innerText = coords[1];
+    
+    map.setView([coords[0], coords[1]], 17);
+    marker.setLatLng([coords[0], coords[1]]);
+    marker.setOpacity(1.0);
+  }
+
+  // Call init() to initialize the WebGL rendering
+  init();
+
+  // Define variables
+  var accel = new THREE.Vector3(0, 0, 0);
+  var coords = [];
+  
+  render(); // Call render() to render the scene
+
+</script>
+</html> 

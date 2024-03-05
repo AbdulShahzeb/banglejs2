@@ -1,0 +1,3 @@
+Run the HTML file and connect to the Bangle on a web browser that supports Bluetooth Low Energy.
+
+Requires an internet connection to work.

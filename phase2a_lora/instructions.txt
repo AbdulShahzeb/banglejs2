@@ -1,0 +1,7 @@
+Upload the fall_detection algorithm to the Bangle's FLASH or install it as an app.
+
+Once code is running on the Bangle, switch back to your Desktop and upload the lora_transmitter.ino onto the Arduino.
+The file may have to be modified with your Bangle's unique MAC address. Once uploaded, the program will connect 
+to the Bangle, read its sensor data and publish it via LoRa.
+
+On a separate system that receives the data, run the lora_receiver.ino file and view it on Serial Monitor.
