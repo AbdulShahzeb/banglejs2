@@ -120,7 +120,7 @@
     /*
      * Send updated gps measurement via BLE
      */
-    if (fix === undefined || fix.fix === 0) return;
+    if (!fix || fix.fix === 0 || !fix.time) return;
 
     var latBuffer = new ArrayBuffer(4);
     var latView = new Uint32Array(latBuffer);
@@ -132,10 +132,10 @@
 
     var timeBuffer = new ArrayBuffer(8);
     var timeView = new DataView(timeBuffer);
-    var currentTime = Date.now().toString();
+    var currentTime = fix.time.getTime().toString();
     var dateArray = [];
 
-    for (var i = 0; i < 13; i++) {
+    for (var i = 0; i < 10; i++) {
         dateArray.push(parseInt(currentTime.charAt(i)));
     }
 
@@ -160,7 +160,7 @@
     } catch (error) {
       if (error.message.includes("BLE restart")) {
         /*
-         * BLE has to restart after service setup.  
+         * BLE has to restart after service setup.
          */
         NRF.disconnect();
       } else {
@@ -178,7 +178,7 @@
 
     var pressureBuf = new ArrayBuffer(4);
     var pressureView = new Uint32Array(pressureBuf);
-    pressureView[0] = Math.round(e.pressure);
+    pressureView[0] = Math.round(e.pressure * 100);
 
     try {
       NRF.updateServices({
