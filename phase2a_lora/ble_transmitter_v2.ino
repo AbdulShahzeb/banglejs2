@@ -4,16 +4,15 @@ Program to establish a publisher/subscriber connection between a Nano 33 BLE and
 Date: 21/02/2024
 Developed by: ACFR
 
-IMPORTANT: BLE GATT HRM Service app *MUST* be installed and running. This service advertises HRM data continuously.
-Link: https://banglejs.com/apps/?id=bootgatthrm
-
 */
 
 #include <ArduinoBLE.h>
 #include <avr/dtostrf.h>
 #include <SPI.h>
-#include <LoRa.h>
 #include <math.h>
+
+// Blue LED Pin
+#define BLUE 24
 
 // Define the UUIDs
 #define HR_SERVICE_UUID "180D"
@@ -33,19 +32,27 @@ Link: https://banglejs.com/apps/?id=bootgatthrm
 #define GPS_PRECISION 6
 #define ASCII_ZERO 48
 
+// default values for loop variables
 unsigned long previousMillis = 0; // Variable to store the last time the action was performed
-const unsigned int interval = 2000; // Interval in milliseconds
+unsigned long currentMillis;
+const unsigned int interval = 1000; // Interval in milliseconds
+char myID[] = "ID01";
+uint8_t bpm = 0;
+float lat_v = 0.0, lon_v = 0.0;
+char lat_array[12], lon_array[12];
+uint8_t time_v[10];
+char time_array[11];
+uint8_t motion_flags[3];
+uint32_t pressure_v = 0;
+bool first_fix_found = false, sentPacket = false;
 
-// Define pins used by LoRa module
-#define ss 4
-#define reset 2
-#define dio0 3
 
 void setup() {
-  Serial.begin(19200);
-  while (!Serial)
-    ;
-  Serial.println("==================================");
+  Serial.begin(9600);
+  Serial1.begin(9600);
+
+  pinMode(BLUE, OUTPUT);
+  digitalWrite(BLUE, HIGH);
 
   // Initialize the BLE
   if (!BLE.begin()) {
@@ -61,18 +68,9 @@ void setup() {
   Serial.println("Arduino Nano 33 BLE");
   Serial.println(" ");
 
-  // Initialise LoRa
-  LoRa.setPins(ss, reset, dio0);
-  while (!LoRa.begin(433E6)) {
-    Serial.println("Connecting to LoRa...");
-    delay(1000);
-  }
-
-  LoRa.setSyncWord(0xF3);
-  Serial.println("LoRa initialised successfully.");
 
   // Wait for the Bangle.js device to be found
-  BLE.scanForAddress("f0:2e:68:49:68:c5");
+  BLE.scanForAddress("ea:a2:de:14:81:4c");
   BLEDevice peripheral = BLE.available();
   while (!peripheral) {
     peripheral = BLE.available();
@@ -92,7 +90,7 @@ void connectToPeripheral() {
 
   // scan for address of Banglejs2
   do {
-    BLE.scanForAddress("f0:2e:68:49:68:c5");
+    BLE.scanForAddress("ea:a2:de:14:81:4c");
     peripheral = BLE.available();
   } while (!peripheral);
 
@@ -119,6 +117,7 @@ void controlPeripheral(BLEDevice peripheral) {
   if (peripheral.connect()) {
     Serial.println("* Connected to peripheral device!");
     Serial.println(" ");
+    digitalWrite(BLUE, LOW);
   } else {
     Serial.println("* Connection to peripheral device failed!");
     Serial.println(" ");
@@ -254,28 +253,13 @@ void controlPeripheral(BLEDevice peripheral) {
   Serial.println("Subscribed to pressure!");
 
 
-  // As long as the connection is maintained, print every update published by the Bangle
-  unsigned long currentMillis;
-  char myID[] = "ID01";
-  uint8_t bpm = 0;
-  float lat_v = 0.0, lon_v = 0.0;
-  char lat_array[12], lon_array[12];
-  uint8_t time_v[13];
-  char time_array[14];
-  uint8_t motion_flags[3];
-  int8_t temp = 25;
-  uint8_t humid = 90;
-  int8_t heat_index = 29;
-  uint16_t voc = 100, co2 = 90, pm25 = 100;
-  uint32_t pressure_v = 0;
-
-  bool first_fix_found = false, new_info = false;
+  // As long as the connection is maintained, transmit every update published by the Bangle
+  Serial.println("Reading biometric data...");
 
   while (peripheral.connected()) {
     currentMillis = millis(); // Get the current time
 
     if (hrmCharacteristic.valueUpdated()) {
-      new_info = true;
       int32_t value = 0;
       hrmCharacteristic.readValue(value);
       bpm = value >> 8; // bit shift to get only the bpm
@@ -283,7 +267,6 @@ void controlPeripheral(BLEDevice peripheral) {
 
     if (lat.valueUpdated() || lon.valueUpdated()) {
       first_fix_found = true;
-      new_info = true;
     
       int32_t value = 0;
       lat.readValue(value);
@@ -297,68 +280,47 @@ void controlPeripheral(BLEDevice peripheral) {
       lon_v = value * pow(10, -GPS_PRECISION);
       dtostrf(lon_v, 11, 6, lon_array);
 
-      time.readValue(time_v, 13);
+      time.readValue(time_v, 10);
 
       // convert time from int array to char array
-      for (int i = 0; i < 13; i++) {
+      for (int i = 0; i < 10; i++) {
           time_array[i] = time_v[i] + ASCII_ZERO;
       }
       // null-terminate the char array
-      time_array[13] = 0;
+      time_array[10] = 0;
     }
 
     if (accel.valueUpdated()) {
-      new_info = true;
       accel.readValue(motion_flags, 3);
     }
 
     if (pressure.valueUpdated()) {
-      new_info = true;
       pressure.readValue(pressure_v);
     }
 
-    // Check if INTERVAL ms have elapsed since the last action
-    if (first_fix_found && new_info && (currentMillis - previousMillis >= interval)) {
-      // Save the current time for the next iteration
+    if (first_fix_found && (currentMillis - previousMillis >= interval)) {
       previousMillis = currentMillis;
-
       /*
         LoRa packet format
         01,+123.123456,-123.123456,1234567890123,220,-99,90,-99,101300,1000,2000,1000,0,0,0
       */
-      char packet[86];
-      heat_index = heatIndex(temp, humid);
-      sprintf(packet, "%s,%s,%s,%s,%u,%d,%u,%d,%u,%u,%u,%u,%u,%u,%u", myID, lat_array, lon_array, time_array, bpm, temp, humid, heat_index, pressure_v, voc, co2, pm25, motion_flags[0], motion_flags[1], motion_flags[2]);
-      Serial.println("Sending packet");
-      sendLoRa(packet);
+      char packet[52];
+      sprintf(packet, "%s,%s,%s,%s,%u,%u,%u,%u,%u", myID, lat_array, lon_array, time_array, bpm, pressure_v, motion_flags[0], motion_flags[1], motion_flags[2]);
+      Serial.print("Sending packet: ");
+      Serial.println(packet);
+      if (!sentPacket) {
+        Serial1.print(packet);
+        Serial1.flush();
+        sentPacket = true;
+      }
 
-      new_info = false;
+      if (Serial1.available()) {
+        Serial1.readString();
+        sentPacket = false;
+      }
     }
   }
   Serial.println("- Peripheral device disconnected!");
 }
 
-int8_t heatIndex(int8_t temperature, uint8_t humidity) {
-  float c1 = -8.78469475556;
-  float c2 = 1.61139411;
-  float c3 = 2.33854883889;
-  float c4 = -0.14611605;
-  float c5 = -0.012308094;
-  float c6 = -0.0164248277778;
-  float c7 = 0.002211732;
-  float c8 = 0.00072546;
-  float c9 = -0.000003582;
-  
-  float T = temperature;
-  float R = humidity;
 
-  float HI = c1 + (c2 * T) + (c3 * R) + (c4 * T * R) + (c5 * T * T) + (c6 * R * R) + (c7 * T * T * R) + (c8 * T * R * R) + (c9 * T * T * R * R);
-
-  return round(HI);
-}
-
-void sendLoRa(const char *packet) {
-  LoRa.beginPacket();
-  LoRa.print(packet);
-  LoRa.endPacket();
-}

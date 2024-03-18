@@ -1,7 +1,10 @@
 Upload the fall_detection algorithm to the Bangle's FLASH or install it as an app.
 
-Once code is running on the Bangle, switch back to your Desktop and upload the lora_transmitter.ino onto the Arduino.
+Once code is running on the Bangle, switch back to your Desktop and upload the ble_transmitter_v2.ino onto the Arduino BLE.
 The file may have to be modified with your Bangle's unique MAC address. Once uploaded, the program will connect 
-to the Bangle, read its sensor data and publish it via LoRa.
+to the Bangle, read its sensor data and print a string to Serial1.
+
+Next, upload the lora_transmitter_v2.ino onto an Arduino Nano. This sketch sets up the env data sensors and receives the Serial string from the Arduino BLE.
+The BLE's biometric data string is combined with the Nano's env data readings into one LoRa packet that is transmitted via the LoRa module.
 
 On a separate system that receives the data, run the lora_receiver.ino file and view it on Serial Monitor.

@@ -151,7 +151,8 @@
   const HRM_MAX = 180;
   const ACCEL_MIN = 0;
   const ACCEL_MAX = 3;
-  const BPM_CRIT = 120;
+  const BPM_CRIT = 110;
+  const FALL_STATUS = false;
   
   var BANGLE_CODE = `
   Bangle.setHRMPower(1);
@@ -245,7 +246,7 @@
     animationEnabled: true,
     theme: "light2",
     title :{
-      text: "Bangle.js HeartRate Monitor"
+      text: "HeartRate Monitor"
     },
     axisY:{
       title: "Heart Rate (bpm)",
