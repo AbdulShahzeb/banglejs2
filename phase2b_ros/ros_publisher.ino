@@ -21,7 +21,7 @@ void setup()
   nh.advertise(bangle_raw);
 
   // Initialise LoRa
-  LoRa.setPins(ss, reset, dio0);
+  LoRa.setPins(CS, RST, G0);
   while (!LoRa.begin(433E6)) {
     delay(1000);
   }
