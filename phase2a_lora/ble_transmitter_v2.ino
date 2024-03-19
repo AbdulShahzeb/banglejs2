@@ -302,7 +302,7 @@ void controlPeripheral(BLEDevice peripheral) {
       previousMillis = currentMillis;
       /*
         LoRa packet format
-        01,+123.123456,-123.123456,1234567890123,220,-99,90,-99,101300,1000,2000,1000,0,0,0
+        ID01,+123.123456,-123.123456,1234567890123,220,101300,0,0,0,-99,90,-99,1000,2000,1000
       */
       char packet[52];
       sprintf(packet, "%s,%s,%s,%s,%u,%u,%u,%u,%u", myID, lat_array, lon_array, time_array, bpm, pressure_v, motion_flags[0], motion_flags[1], motion_flags[2]);
@@ -322,5 +322,3 @@ void controlPeripheral(BLEDevice peripheral) {
   }
   Serial.println("- Peripheral device disconnected!");
 }
-
-

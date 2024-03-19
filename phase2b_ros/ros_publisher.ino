@@ -4,21 +4,21 @@
 #include <LoRa.h>
 
 // Define pins used by LoRa module
-#define ss 4
-#define reset 2
-#define dio0 3
-#define PACKET_SIZE 88
+#define CS 3
+#define RST 4
+#define G0 2
+#define PACKET_SIZE 86
 
 ros::NodeHandle nh;
 
 std_msgs::String str_msg;
-ros::Publisher bangle("bangle", &str_msg);
+ros::Publisher bangle_raw("bangle_raw", &str_msg);
 
 void setup()
 {
   // Init ROS node handle
   nh.initNode();
-  nh.advertise(bangle);
+  nh.advertise(bangle_raw);
 
   // Initialise LoRa
   LoRa.setPins(ss, reset, dio0);
@@ -41,7 +41,7 @@ void loop()
       char LoRaArr[PACKET_SIZE + 1];
       LoRaData.toCharArray(LoRaArr, sizeof(LoRaArr));
       str_msg.data = LoRaArr;
-      bangle.publish( &str_msg ); 
+      bangle_raw.publish( &str_msg ); 
       nh.spinOnce();
     }
   }

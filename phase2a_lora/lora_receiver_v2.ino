@@ -1,19 +1,24 @@
+/*
+
+Program to receive LoRa packets from the transmitter
+Date: 18/03/2024
+Developed by: ACFR
+
+*/
+
 #include <SPI.h>
 #include <LoRa.h>
 
 // Define pins used by LoRa module
-#define ss 4
-#define reset 2
-#define dio0 3
+#define CS 3
+#define RST 4
+#define G0 2
 
 void setup() {
-  Serial.begin(19200);
-  while (!Serial)
-    ;
-  Serial.println("==================================");
+  Serial.begin(57600);
 
   // Initialise LoRa
-  LoRa.setPins(ss, reset, dio0);
+  LoRa.setPins(CS, RST, G0);
   while (!LoRa.begin(433E6)) {
     Serial.println("Connecting to LoRa...");
     delay(1000);
